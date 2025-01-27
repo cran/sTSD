@@ -14,19 +14,19 @@ spp_test(x, lag_short = TRUE, n_sims = 1000, sim_hyp = "nonstationary")
 "long-term" lag is used.}
 
 \item{n_sims}{the number of simulations for calculating an interval or
-distribution of test statistics of a white-noise time series. Defaults to
-1,000.}
+distribution of test statistics for assessing stationarity or
+non-stationarity. Defaults to 1,000.}
 
 \item{sim_hyp}{can be either "stationary" or "nonstationary". If
-"stationary" (the default), the function runs Phillips-Perron tests on
-simulated stationary (pure white noise) data. This allows the user to assess
+"stationary", the function runs Phillips-Perron tests on simulated stationary
+(pure white noise) data. This allows the user to assess
 compatibility/plausibility of the test statistic against a distribution of
 test statistics that are known to be pure white noise (in expectation). If
-"nonstationary", the function generates three different data sets of a pure
-random walk, a random walk with a drift, and a random walk with a drift and
-trend. It then runs Phillips-Perron tests on all those. This allows the user
-to assess the compatibility/plausibility of their test statistics with data
-that are known to be nonstationary in some form.}
+"nonstationary" (default), the function generates three different data sets
+of a pure random walk, a random walk with a drift, and a random walk with a
+drift and trend. It then runs Phillips-Perron tests on all those. This allows
+the user to assess the compatibility/plausibility of their test statistics
+with data that are known to be nonstationary in some form.}
 }
 \value{
 \code{spp_test()} returns a list of length 3. The first element
@@ -42,32 +42,37 @@ attributes about the procedure for post-processing.
 unit root in a time series by way of the Phillips-Perron test. It takes a
 vector and performs three Phillips-Perron tests (no drift, no trend; drift, no
 trend; drift and trend) and calculates both rho and tau statistics as one
-normally would. Rather than interpolate or approximate a *p*-value, it
-simulates some user-specified number of Phillips-Perron tests of a known,
-white-noise time series matching the length of the time series the user
-provides. This allows the user to make assessments of non-stationarity or
-stationarity by way of simulation rather than approximation from received
-critical values by way of books or tables some years out of date.
+normally would. Rather than interpolate or approximate a \emph{p}-value, it
+simulates some user-specified number of Phillips-Perron tests of either a
+known, non-stationary time series or a known, white-noise time series
+matching the length of the time series the user provides. This allows the
+user to make assessments of non-stationarity or stationarity by way of
+simulation rather than approximation from received critical values by way of
+various books/tables.
 }
 \details{
 Some knowledge of Augmented Dickey-Fuller and the Phillips-Perron
 procedure is assumed here. Generally, the Phillips-Perron test purports to
-build on the Augmented Dickey-Fuller procedure through two primary means. The
-first is relaxing the need to specify or assume lag structures ad hoc or ex
-ante. Only a short-term lag or long-term lag are necessary. The second is
-that its robust to various forms of heteroskedasticity in the error term.
+build on the Augmented Dickey-Fuller (ADF) procedure through two primary
+means. The first is relaxing the need to be as deliberate about lag structures
+as ADF is, typically asking for some kind of long- or short-term lag for the
+bandwidth/kernel. The second, related to this, is that its nonparametric
+procedure makes it robust to various forms of heteroskedasticity in the error
+term.
 
 The short-term and long-term lags follow the convention introduced in the
 Phillips-Perron test. The short-term lag uses the default number of
-Newey-West lags, defined as the floor of 4*(n/100)^.25 where `n` is the length
+Newey-West lags, defined as the floor of 4*(n/100)^.25 where \code{n} is the length
 of the time series. The long-term lag substitutes 4 for 12 in this equation.
+We have Schwert (1989) to thank for these defaults. Future iterations of this
+function may permit manual lag selection, but this is fine for now.
 
 This function specifies three different types of tests: 1) no drift, no trend,
-2) drift, no trend, and 3) drift and trend. In the language of the `lm()`
-function, the first is `lm(y ~ ly - 1)` where `y` is the value of `y` and
-`ly` is its first-order lag. The second test is `lm(y ~ ly)`, intuitively
-suggesting the *y*-intercept in this equation is the "drift". The third would
-be `lm(y ~ ly + t)` with `t` being a simple integer that increases by 1 for
+2) drift, no trend, and 3) drift and trend. In the language of the \code{lm()}
+function, the first is \code{lm(y ~ ly - 1)} where \code{y} is the value of \code{y} and
+\code{ly} is its first-order lag. The second test is \code{lm(y ~ ly)}, intuitively
+suggesting the \emph{y}-intercept in this equation is the "drift". The third would
+be \code{lm(y ~ ly + t)} with \code{t} being a simple integer that increases by 1 for
 each observation (i.e. a time-trend).
 
 There are two types of statistics in the Phillips-Perron test: rho and tau.

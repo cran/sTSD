@@ -5,23 +5,28 @@
 #' vector and performs three Phillips-Perron tests (no drift, no trend; drift, no
 #' trend; drift and trend) and calculates both rho and tau statistics as one
 #' normally would. Rather than interpolate or approximate a *p*-value, it
-#' simulates some user-specified number of Phillips-Perron tests of a known,
-#' white-noise time series matching the length of the time series the user
-#' provides. This allows the user to make assessments of non-stationarity or
-#' stationarity by way of simulation rather than approximation from received
-#' critical values by way of books or tables some years out of date.
+#' simulates some user-specified number of Phillips-Perron tests of either a
+#' known, non-stationary time series or a known, white-noise time series
+#' matching the length of the time series the user provides. This allows the
+#' user to make assessments of non-stationarity or stationarity by way of
+#' simulation rather than approximation from received critical values by way of
+#' various books/tables.
 #'
 #' @details Some knowledge of Augmented Dickey-Fuller and the Phillips-Perron
 #' procedure is assumed here. Generally, the Phillips-Perron test purports to
-#' build on the Augmented Dickey-Fuller procedure through two primary means. The
-#' first is relaxing the need to specify or assume lag structures ad hoc or ex
-#' ante. Only a short-term lag or long-term lag are necessary. The second is
-#' that its robust to various forms of heteroskedasticity in the error term.
+#' build on the Augmented Dickey-Fuller (ADF) procedure through two primary
+#' means. The first is relaxing the need to be as deliberate about lag structures
+#' as ADF is, typically asking for some kind of long- or short-term lag for the
+#' bandwidth/kernel. The second, related to this, is that its nonparametric
+#' procedure makes it robust to various forms of heteroskedasticity in the error
+#' term.
 #'
 #' The short-term and long-term lags follow the convention introduced in the
 #' Phillips-Perron test. The short-term lag uses the default number of
 #' Newey-West lags, defined as the floor of 4*(n/100)^.25 where `n` is the length
 #' of the time series. The long-term lag substitutes 4 for 12 in this equation.
+#' We have Schwert (1989) to thank for these defaults. Future iterations of this
+#' function may permit manual lag selection, but this is fine for now.
 #'
 #' This function specifies three different types of tests: 1) no drift, no trend,
 #' 2) drift, no trend, and 3) drift and trend. In the language of the `lm()`
@@ -71,18 +76,18 @@
 #' "short-term" lag is used for the Phillips-Perron test. If \code{FALSE}, the
 #' "long-term" lag is used.
 #' @param n_sims the number of simulations for calculating an interval or
-#' distribution of test statistics of a white-noise time series. Defaults to
-#' 1,000.
+#' distribution of test statistics for assessing stationarity or
+#' non-stationarity. Defaults to 1,000.
 #' @param sim_hyp can be either "stationary" or "nonstationary". If
-#' "stationary" (the default), the function runs Phillips-Perron tests on
-#' simulated stationary (pure white noise) data. This allows the user to assess
+#' "stationary", the function runs Phillips-Perron tests on simulated stationary
+#' (pure white noise) data. This allows the user to assess
 #' compatibility/plausibility of the test statistic against a distribution of
 #' test statistics that are known to be pure white noise (in expectation). If
-#' "nonstationary", the function generates three different data sets of a pure
-#' random walk, a random walk with a drift, and a random walk with a drift and
-#' trend. It then runs Phillips-Perron tests on all those. This allows the user
-#' to assess the compatibility/plausibility of their test statistics with data
-#' that are known to be nonstationary in some form.
+#' "nonstationary" (default), the function generates three different data sets
+#' of a pure random walk, a random walk with a drift, and a random walk with a
+#' drift and trend. It then runs Phillips-Perron tests on all those. This allows
+#' the user to assess the compatibility/plausibility of their test statistics
+#' with data that are known to be nonstationary in some form.
 #'
 #' @examples
 #'
@@ -96,15 +101,10 @@
 #' @importFrom stats lm
 #' @importFrom stats resid
 #' @importFrom stats rnorm
-#' @importFrom stats arima.sim
 #' @export
 
-spp_test <- function(x, lag_short = TRUE, n_sims = 1000,
-                     sim_hyp = "nonstationary") {
+spp_test <- function(x, lag_short = TRUE, n_sims = 1000, sim_hyp = "nonstationary") {
 
-  # if (!pp_stat %in% c("tau", "rho") | length(pp_stat) > 1) {
-  #   stop("The only 'pp_stat' arguments that make sense in this context is 'tau' or 'rho'. Pick one of the two.")
-  # }
 
   if(!sim_hyp %in% c("stationary", "nonstationary")) {
     stop("The 'sim_hyp' argument must be 'stationary' or 'nonstationary'.")
@@ -130,6 +130,8 @@ spp_test <- function(x, lag_short = TRUE, n_sims = 1000,
     q <-  floor(12*(n/100)^0.25)
   }
 
+
+
   calc_pp <- function(mod, m) {
     index <- ifelse(m > 1, 2, 1)
     resids <- resid(mod)
@@ -149,25 +151,70 @@ spp_test <- function(x, lag_short = TRUE, n_sims = 1000,
   }
 
 
+
+
   Stats <- rbind(calc_pp(M1,1),
                  calc_pp(M2,2),
                  calc_pp(M3,3))
 
 
+  # * Simulations ----
   Sims <- data.frame()
-  if(sim_hyp == "stationary") {
+
+  if(sim_hyp == "stationary") { # * If sim_hyp == "stationary ----
+
     for (i in 1:n_sims) {
-      fake_x <- rnorm(length(x))
 
-      fm <- embed(fake_x, 2)
-      fdat <- data.frame(y = fm[, 1], ly = fm[, 2])
-      fdat$t <- 1:length(fdat$y)
+      #fake_x <- rnorm(length(x))
+      # fake_x <- sim_ts(length(x), b0 = 0, bt = 0, white_noise = wn)
 
-      fn <- length(fdat$y)
 
-      fM1 <- lm(y ~ ly - 1, fdat) # no drift, no trend
-      fM2 <- lm(y ~ ly, fdat) # drift, no trend
-      fM3 <- lm(y ~ ly + t, fdat) # drift and trend
+      time <- 1:length(x)
+      nd_nt <- sim_ts(length(x), b0 = 0, bt = 0, white_noise = TRUE)
+
+      fake_b0 <- 2 * stats::rbinom(n = 1, size = 1, prob = 0.5) - 1
+      d_nt <- sim_ts(length(x), b0 = fake_b0, bt = 0, white_noise = TRUE)
+
+      fake_bt <- fake_b0/10
+      d_t <- sim_ts(length(x), b0 = fake_b0, bt = fake_bt, white_noise = TRUE)
+
+
+      # okie doke, this could get tedious.
+      # Let's do it for the first one...
+
+      fm_nd_nt <- embed(nd_nt, 2)
+      fdat_nd_nt <- data.frame(y = fm_nd_nt[, 1], ly = fm_nd_nt[, 2])
+      fdat_nd_nt$t <- 1:length(fdat_nd_nt$y)
+
+      fn_nd_nt <- length(fdat_nd_nt$y)
+
+      fM1 <- lm(y ~ ly - 1, fdat_nd_nt) # no drift, no trend
+
+      # The second one...
+
+      fm_d_nt <- embed(d_nt, 2)
+      fdat_d_nt <- data.frame(y = fm_d_nt[, 1], ly = fm_d_nt[, 2])
+      fdat_d_nt$t <- 1:length(fdat_d_nt$y)
+
+      fn_d_nt <- length(fdat_d_nt$y)
+
+      fM2 <- lm(y ~ ly, fdat_nd_nt) # drift, no trend
+
+
+      # The third one...
+
+      fm_d_t <- embed(d_t, 2)
+      fdat_d_t <- data.frame(y = fm_d_t[, 1], ly = fm_d_t[, 2])
+      fdat_d_t$t <- 1:length(fdat_d_t$y)
+
+      fn_d_t <- length(fdat_d_t$y)
+
+      fM3 <- lm(y ~ ly + t, fdat_d_t) # drift and trend
+
+
+      # fM1 <- lm(y ~ ly - 1, fdat) # no drift, no trend
+      # fM2 <- lm(y ~ ly, fdat) # drift, no trend
+      # fM3 <- lm(y ~ ly + t, fdat) # drift and trend
 
       fakeStats <- rbind(calc_pp(fM1, 1),
                          calc_pp(fM2, 2),
@@ -183,19 +230,20 @@ spp_test <- function(x, lag_short = TRUE, n_sims = 1000,
 
 
     }
-  } else { # Assuming we're going to simulate non-stationary data.
+  } else { # * else if sim_hyp == "non-stationary" ----
     for (i in 1:n_sims) {
 
       fake_x <- rnorm(length(x))
       time <- 1:length(x)
 
-      nd_nt <- cumsum(fake_x)
-      d_nt <- cumsum(2 + fake_x)
-      # d_t <- cumsum(rnorm(length(x), mean = time,
-      #                     sd = sqrt(time)))
+      nd_nt <- sim_ts(length(x), b0 = 0, bt = 0, white_noise = FALSE)
 
-      #d_t <- 1/sqrt(time)*cumsum(fake_x)
-      d_t <- as.vector(arima.sim(n = length(x), model = list(ar = .99)))
+      fake_b0 <- 2 * stats::rbinom(n = 1, size = 1, prob = 0.5) - 1
+      d_nt <- sim_ts(length(x), b0 = fake_b0, bt = 0, white_noise = FALSE)
+
+      fake_bt <- fake_b0/10
+      d_t <- sim_ts(length(x), b0 = fake_b0, bt = fake_bt, white_noise = FALSE)
+
 
       # okie doke, this could get tedious.
       # Let's do it for the first one...
@@ -251,7 +299,8 @@ spp_test <- function(x, lag_short = TRUE, n_sims = 1000,
   attatt <- data.frame(lags = q,
                        sim_hyp = sim_hyp,
                        n_sims = n_sims,
-                       n = length(x))
+                       n = length(x),
+                       test = "pp")
 
   output <- list("stats" = Stats,
                  "sims" = Sims,
